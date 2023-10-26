@@ -1,5 +1,7 @@
 # Object Detection using TensorFlow and TensorFlow Hub
 
+![Cover Image](Car.png)
+
 This repository demonstrates how to perform object detection on custom images using TensorFlow and TensorFlow Hub in a Google Colab environment. The code clones the TensorFlow Models repository, installs necessary dependencies, and sets up the environment for object detection. It then uses a pre-trained model from TensorFlow Hub to perform object detection on a sample image from a custom dataset.
 
 ## Dependencies
