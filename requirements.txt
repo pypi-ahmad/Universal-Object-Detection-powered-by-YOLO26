@@ -1,0 +1,7 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch
+torchvision
+ultralytics>=8.4.0
+streamlit
+opencv-python-headless
+pillow

@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  omnidetect-ai:
+    build: .
+    container_name: omnidetect-ai
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
