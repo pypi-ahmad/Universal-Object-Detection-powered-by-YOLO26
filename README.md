@@ -27,8 +27,8 @@
 
 1.  **Clone the Repository**
     ```bash
-    git clone https://github.com/YourUsername/OmniDetect-AI.git
-    cd OmniDetect-AI
+    git clone https://github.com/pypi-ahmad/Universal-Object-Detection-powered-by-YOLO26.git
+    cd Universal-Object-Detection-powered-by-YOLO26
     ```
 
 2.  **Install Dependencies**
