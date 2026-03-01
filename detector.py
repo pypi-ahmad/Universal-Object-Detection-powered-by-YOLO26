@@ -2,7 +2,6 @@ import cv2
 from ultralytics import YOLO
 import torch
 from PIL import Image
-import numpy as np
 
 class CarDetector:
     """
@@ -21,9 +20,11 @@ class CarDetector:
         """
         if torch.cuda.is_available():
             self.device = 'cuda'
-            print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+            self.device_name = torch.cuda.get_device_name(0)
+            print(f"Using GPU: {self.device_name}")
         else:
             self.device = 'cpu'
+            self.device_name = 'cpu'
             print("Warning: CUDA not available. Using CPU.")
             
         print(f"Initializing CarDetector with {model_name} on {self.device}...")
@@ -52,6 +53,18 @@ class CarDetector:
         Returns:
             tuple: (PIL.Image.Image, int) - Annotated image and detection count.
         """
+        if image is None:
+            raise ValueError("Input image cannot be None.")
+
+        if not isinstance(conf_threshold, (int, float)):
+            raise TypeError("conf_threshold must be a float between 0.0 and 1.0.")
+
+        if conf_threshold < 0.0 or conf_threshold > 1.0:
+            raise ValueError("conf_threshold must be between 0.0 and 1.0.")
+
+        if classes == []:
+            classes = None
+
         # Run inference
         results = self.model.predict(
             source=image,
@@ -92,10 +105,12 @@ class CarDetector:
             
             # Draw Label Background
             (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
-            cv2.rectangle(img_bgr, (x1, y1 - 20), (x1 + w, y1), box_color, -1)
+            top = max(0, y1 - h - 8)
+            cv2.rectangle(img_bgr, (x1, top), (x1 + w, y1), box_color, -1)
             
             # Draw Text
-            cv2.putText(img_bgr, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
+            text_y = max(h + 2, y1 - 5)
+            cv2.putText(img_bgr, label, (x1, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
 
         # Convert BGR to RGB for PIL/Streamlit compatibility
         annotated_frame_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)

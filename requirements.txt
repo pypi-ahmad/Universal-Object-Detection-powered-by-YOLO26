@@ -1,7 +1,8 @@
 --extra-index-url https://download.pytorch.org/whl/cu130
-torch
-torchvision
-ultralytics>=8.4.0
-streamlit
-opencv-python-headless
-pillow
+torch==2.10.0+cu130
+torchvision==0.25.0+cu130
+ultralytics==8.4.9
+streamlit==1.53.1
+opencv-python-headless==4.13.0.90
+pillow==12.1.0
+numpy==2.4.2

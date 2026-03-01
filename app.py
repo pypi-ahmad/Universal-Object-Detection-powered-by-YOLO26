@@ -4,7 +4,6 @@ import tempfile
 import os
 import time
 from PIL import Image
-import numpy as np
 from detector import CarDetector
 
 # Page Config
@@ -23,7 +22,6 @@ st.sidebar.header("Model Configuration")
 # Model Size Dropdown
 model_options = {
     'Nano (Fastest)': 'yolo26n.pt',
-    'Small': 'yolo26s.pt',
     'Medium (Balanced)': 'yolo26m.pt',
     'Large (Best Accuracy)': 'yolo26l.pt'
 }
@@ -49,7 +47,7 @@ except Exception as e:
 
 # Performance Info
 if detector.device == 'cuda':
-    st.sidebar.info("Running on NVIDIA RTX 4060")
+    st.sidebar.info(f"Running on {detector.device_name}")
 
 conf_threshold = st.sidebar.slider("Confidence Threshold", 0.0, 1.0, 0.4, 0.05)
 
@@ -77,8 +75,8 @@ selected_names = st.sidebar.multiselect(
 
 # Map selected names to IDs
 if not selected_names:
-    st.sidebar.warning("Please select at least one class.")
-    selected_classes = []
+    st.sidebar.info("No class filter selected. Detecting all classes.")
+    selected_classes = None
 else:
     selected_classes = [name_to_id[n] for n in selected_names]
 
@@ -101,12 +99,12 @@ with tab1:
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Original")
-            st.image(image, width='stretch')
+            st.image(image, use_container_width=True)
         with col2:
             st.subheader(f"Detected ({count})")
-            st.image(result_img, width='stretch')
+            st.image(result_img, use_container_width=True)
             
-        st.metric(label="Vehicles Detected", value=count)
+        st.metric(label="Objects Detected", value=count)
 
 # --- Tab 2: Video Analytics ---
 with tab2:
@@ -115,10 +113,9 @@ with tab2:
     
     if uploaded_video:
         # Save temp file
-        tfile = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-        tfile.write(uploaded_video.read())
-        video_path = tfile.name
-        tfile.close() # Close file so it can be opened by cv2
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tfile:
+            tfile.write(uploaded_video.read())
+            video_path = tfile.name
         
         cap = cv2.VideoCapture(video_path)
         
@@ -129,32 +126,28 @@ with tab2:
             frame_count = 0
             
             # Stop button
-            if st.button("Stop Video Processing"):
-                cap.release()
-                st.write("Stopped.")
-            else:
-                while cap.isOpened():
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
-                    
-                    frame_count += 1
-                    
-                    # Optimization: Process every 3rd frame
-                    if frame_count % 3 != 0:
-                        continue
-                    
-                    # Convert Frame to Image for display/detect (detect handles numpy BGR but returns PIL RGB)
-                    # To pass to detector: frame is BGR numpy array
-                    result_img, count = detector.detect(frame, conf_threshold, selected_classes)
-                    
-                    # Display
-                    st_frame.image(result_img, caption=f"Frame {frame_count} | Detected: {count}", width='stretch')
-                    
-                    # Small sleep to allow UI updates if needed, though streamlit usually handles it
-                    # time.sleep(0.01) 
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
                 
-                cap.release()
+                frame_count += 1
+                
+                # Optimization: Process every 3rd frame
+                if frame_count % 3 != 0:
+                    continue
+                
+                # Convert Frame to Image for display/detect (detect handles numpy BGR but returns PIL RGB)
+                # To pass to detector: frame is BGR numpy array
+                result_img, count = detector.detect(frame, conf_threshold, selected_classes)
+                
+                # Display
+                st_frame.image(result_img, caption=f"Frame {frame_count} | Detected: {count}", use_container_width=True)
+                
+                # Small sleep to allow UI updates
+                time.sleep(0.01)
+                
+            cap.release()
         
         # Cleanup
         try:
@@ -165,50 +158,37 @@ with tab2:
 # --- Tab 3: Live Scout (Webcam) ---
 with tab3:
     st.header("Live Scout")
-    
-    # Using a checkbox to start/stop
-    run_camera = st.checkbox("Start Camera")
-    
-    if run_camera:
-        # Placeholders
+
+    if "run_camera" not in st.session_state:
+        st.session_state.run_camera = False
+    if "camera_cap" not in st.session_state:
+        st.session_state.camera_cap = None
+
+    st.checkbox("Start Camera", key="run_camera")
+    if st.button("Stop Camera"):
+        st.session_state.run_camera = False
+
+    if st.session_state.run_camera:
         st_frame_cam = st.empty()
-        stop_btn = st.button("Stop Camera")
-        
-        if stop_btn:
-            # This logic is a bit tricky in Streamlit. 
-            # If 'Stop' is clicked, the script reruns. 'run_camera' might still be true unless we uncheck it or use session state.
-            # But the loop below blocks.
-            pass
-        
-        # Use DirectShow on Windows to avoid MSMF errors
-        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-        
+
+        if st.session_state.camera_cap is None:
+            st.session_state.camera_cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+        cap = st.session_state.camera_cap
         if not cap.isOpened():
             st.error("Cannot open webcam.")
+            st.session_state.run_camera = False
         else:
-            while not stop_btn:
-                ret, frame = cap.read()
-                if not ret:
-                    st.error("Failed to capture image from camera.")
-                    break
-                
+            ret, frame = cap.read()
+            if not ret:
+                st.error("Failed to capture image from camera.")
+                st.session_state.run_camera = False
+            else:
                 result_img, count = detector.detect(frame, conf_threshold, selected_classes)
-                
-                st_frame_cam.image(result_img, caption=f"Live Feed | Detected: {count}", width='stretch')
-                
-                # Check for stop in a specific way if possible? 
-                # Streamlit doesn't support live interruption easily without rerun.
-                # But `st.button` inside a loop doesn't work well (it needs unique key and won't be registered until script finishes loop usually).
-                # Actually, standard practice is to use a "Stop" button *outside* detection loop logic usually doesn't work because loop blocks.
-                # So we rely on "Stop" button being clicked which triggers rerun, but since we are in a loop, we might not see it.
-                # However, changing the checkbox `run_camera` acts as a stop. Unchecking it triggers rerun and `run_camera` becomes false.
-                # So the loop needs to be non-blocking or check state? 
-                # Actually, if we use `while run_camera`, `run_camera` variable doesn't update during the loop.
-                # So we rely on user interaction triggers a rerun which kills the current script execution? 
-                # Yes, Streamlit stops execution on widget interaction. So unchecking the box stops the loop.
-                # But adding an explicit "Stop" button is requested.
-                # We can't really put a working Stop button *after* the loop starts if the loop blocks.
-                # We can try to rely on the checkbox.
-                pass
-            
-            cap.release()
+                st_frame_cam.image(result_img, caption=f"Live Feed | Detected: {count}", use_container_width=True)
+                time.sleep(0.01)
+                st.rerun()
+    else:
+        if st.session_state.camera_cap is not None:
+            st.session_state.camera_cap.release()
+            st.session_state.camera_cap = None
