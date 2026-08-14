@@ -254,3 +254,5 @@ Potential improvements directly implied by current implementation:
 4. Split UI and inference docs further by adding function-level API docs in source files.
 
 
+
+<p align="center">Made with ❤️ by Ahmad Mujtaba</p>
